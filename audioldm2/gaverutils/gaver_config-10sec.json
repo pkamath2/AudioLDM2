@@ -1,0 +1,30 @@
+{
+    "scratch_tinny_sample0_rate0": {
+        "impulse_time": 10.0,
+        "attack_lf": 4200,
+        "attack_hf": 7900,
+        "trail_lf": 4200,
+        "trail_hf": 7900,
+        "damping_mult": 0.2,
+        "damping_fade_expo": 1,
+        "filter_order": 3,
+        "hittype": "scratch",
+        "locs": [
+            0.05
+        ]
+    },
+    "scratch_muffled_sample0_rate0": {
+        "impulse_time": 10.0,
+        "attack_lf": 100,
+        "attack_hf": 300,
+        "trail_lf": 100,
+        "trail_hf": 300,
+        "damping_mult": 0.99,
+        "damping_fade_expo": 2,
+        "filter_order": 2,
+        "hittype": "scratch",
+        "locs": [
+            0.05
+        ]
+    }
+}
