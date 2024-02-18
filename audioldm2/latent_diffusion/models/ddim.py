@@ -1,4 +1,4 @@
-"""SAMPLING ONLY."""
+"""SAMPLING ONLY.""" 
 
 import torch
 import numpy as np
@@ -115,6 +115,7 @@ class DDIMSampler(object):
         unconditional_conditioning=None,  # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
         dynamic_threshold=None,
         ucg_schedule=None,
+        attention_weights=None,
         **kwargs,
     ):
         # if conditioning is not None:
@@ -140,7 +141,7 @@ class DDIMSampler(object):
         size = (batch_size, C, H, W)
         # print(f'Data shape for DDIM sampling is {size}, eta {eta}')
 
-        samples, intermediates = self.ddim_sampling(
+        samples, intermediates, predicted_noise, predicted_uncond_noise = self.ddim_sampling(
             conditioning,
             size,
             callback=callback,
@@ -159,8 +160,9 @@ class DDIMSampler(object):
             unconditional_conditioning=unconditional_conditioning,
             dynamic_threshold=dynamic_threshold,
             ucg_schedule=ucg_schedule,
+            attention_weights=attention_weights
         )
-        return samples, intermediates
+        return samples, intermediates, predicted_noise, predicted_uncond_noise
 
     @torch.no_grad()
     def ddim_sampling(
@@ -184,14 +186,18 @@ class DDIMSampler(object):
         unconditional_conditioning=None,
         dynamic_threshold=None,
         ucg_schedule=None,
+        attention_weights=None
     ):
         device = self.model.betas.device
         b = shape[0]
         if x_T is None:
+            print("Here because x_T is None. x_T shape should be = ",shape)
             img = torch.randn(shape, device=device)
         else:
+            print("Here because x_T is preset. x_T shape passes is = ",x_T.shape)
             img = x_T
-
+            # img = img.cuda()
+        
         if timesteps is None:
             timesteps = (
                 self.ddpm_num_timesteps
@@ -208,7 +214,7 @@ class DDIMSampler(object):
             )
             timesteps = self.ddim_timesteps[:subset_end]
 
-        intermediates = {"x_inter": [img], "pred_x0": [img]}
+        intermediates = {"x_inter": [img], "pred_x0": [img], "predicted_noise": [img]}
         time_range = (
             reversed(range(0, timesteps))
             if ddim_use_original_steps
@@ -248,8 +254,9 @@ class DDIMSampler(object):
                 unconditional_guidance_scale=unconditional_guidance_scale,
                 unconditional_conditioning=unconditional_conditioning,
                 dynamic_threshold=dynamic_threshold,
+                attention_weights=attention_weights
             )
-            img, pred_x0 = outs
+            img, pred_x0, predicted_noise, predicted_uncond_noise = outs
             if callback:
                 callback(i)
             if img_callback:
@@ -258,8 +265,9 @@ class DDIMSampler(object):
             if index % log_every_t == 0 or index == total_steps - 1:
                 intermediates["x_inter"].append(img)
                 intermediates["pred_x0"].append(pred_x0)
+                intermediates["predicted_noise"].append(predicted_noise)
 
-        return img, intermediates
+        return img, intermediates, predicted_noise, predicted_uncond_noise
 
     @torch.no_grad()
     def p_sample_ddim(
@@ -278,6 +286,7 @@ class DDIMSampler(object):
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None,
         dynamic_threshold=None,
+        attention_weights=None
     ):
         b, *_, device = *x.shape, x.device
 
@@ -293,7 +302,7 @@ class DDIMSampler(object):
             model_uncond = self.model.apply_model(
                 x_in, t_in, unconditional_conditioning
             )
-            model_t = self.model.apply_model(x_in, t_in, c)
+            model_t = self.model.apply_model(x_in, t_in, c, attention_weights=attention_weights)
 
             model_output = model_uncond + unconditional_guidance_scale * (
                 model_t - model_uncond
@@ -352,7 +361,7 @@ class DDIMSampler(object):
         if noise_dropout > 0.0:
             noise = torch.nn.functional.dropout(noise, p=noise_dropout)
         x_prev = a_prev.sqrt() * pred_x0 + dir_xt + noise
-        return x_prev, pred_x0
+        return x_prev, pred_x0, e_t, model_uncond
 
     @torch.no_grad()
     def encode(

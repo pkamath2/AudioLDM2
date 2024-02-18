@@ -49,6 +49,22 @@ def get_mel_from_wav(audio, _stft):
     energy = torch.squeeze(energy, 0).numpy().astype(np.float32)
     return melspec, magnitudes, energy
 
+def pad_spec(log_mel_spec):
+    target_length = 1024
+
+    n_frames = log_mel_spec.shape[0]
+    p = target_length - n_frames
+    # cut and pad
+    if p > 0:
+        m = torch.nn.ZeroPad2d((0, 0, 0, p))
+        log_mel_spec = m(log_mel_spec)
+    elif p < 0:
+        log_mel_spec = log_mel_spec[0 : target_length, :]
+
+    if log_mel_spec.size(-1) % 2 != 0:
+        log_mel_spec = log_mel_spec[..., :-1]
+
+    return log_mel_spec
 
 def inv_mel_spec(mel, out_filename, _stft, griffin_iters=60):
     mel = torch.stack([mel])

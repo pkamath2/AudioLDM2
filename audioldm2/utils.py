@@ -189,6 +189,8 @@ def default_audioldm_config(model_name="audioldm2-full"):
         basic_config=get_audioldm_48k_config()
     if("t5" in model_name):
         basic_config=get_audioldm_crossattn_t5_config()
+
+    print(basic_config)
     return basic_config
 
 class MyProgressBar:

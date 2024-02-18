@@ -126,7 +126,7 @@ class DDPM(nn.Module):
 
         self.channels = channels
         self.use_positional_encodings = use_positional_encodings
-        self.model = DiffusionWrapper(unet_config, conditioning_key)
+        self.model = DiffusionWrapper(unet_config, conditioning_key) #PK: UNet Model
         count_params(self.model, verbose=True)
         self.use_ema = use_ema
         if self.use_ema:
@@ -1031,10 +1031,10 @@ class LatentDiffusion(DDPM):
             new_cond_dict[key] = cond_dict[key]
         return new_cond_dict
 
-    def apply_model(self, x_noisy, t, cond, return_ids=False):
+    def apply_model(self, x_noisy, t, cond, return_ids=False, attention_weights=None):
         cond = self.reorder_cond_dict(cond)
 
-        x_recon = self.model(x_noisy, t, cond_dict=cond)
+        x_recon = self.model(x_noisy, t, cond_dict=cond, attention_weights=attention_weights)
 
         if isinstance(x_recon, tuple) and not return_ids:
             return x_recon[0]
@@ -1425,6 +1425,8 @@ class LatentDiffusion(DDPM):
         unconditional_conditioning=None,
         use_plms=False,
         mask=None,
+        x_T=None,
+        attention_weights=None,
         **kwargs,
     ):
         if mask is not None:
@@ -1432,10 +1434,12 @@ class LatentDiffusion(DDPM):
         else:
             shape = (self.channels, self.latent_t_size, self.latent_f_size)
 
-        intermediate = None
+        intermediates = None
+        predicted_noise = None
+        predicted_uncond_noise = None
         if ddim and not use_plms:
             ddim_sampler = DDIMSampler(self, device=self.device)
-            samples, intermediates = ddim_sampler.sample(
+            samples, intermediates, predicted_noise, predicted_uncond_noise = ddim_sampler.sample(
                 ddim_steps,
                 batch_size,
                 shape,
@@ -1444,6 +1448,8 @@ class LatentDiffusion(DDPM):
                 unconditional_guidance_scale=unconditional_guidance_scale,
                 unconditional_conditioning=unconditional_conditioning,
                 mask=mask,
+                x_T=x_T,
+                attention_weights=attention_weights,
                 **kwargs,
             )
         elif use_plms:
@@ -1471,7 +1477,7 @@ class LatentDiffusion(DDPM):
                 **kwargs,
             )
 
-        return samples, intermediate
+        return samples, intermediates, predicted_noise, predicted_uncond_noise
 
     @torch.no_grad()
     def generate_batch(
@@ -1484,11 +1490,14 @@ class LatentDiffusion(DDPM):
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None,
         use_plms=False,
+        attention_weights=None,
         **kwargs,
     ):
         # Generate n_gen times and select the best
         # Batch: audio, text, fnames
-        assert x_T is None
+        
+        #PK: Commented. Need to pass same x_T
+        #assert x_T is None
 
         if use_plms:
             assert ddim_steps is not None
@@ -1533,7 +1542,7 @@ class LatentDiffusion(DDPM):
                     ].get_unconditional_condition(batch_size)
 
             fnames = list(super().get_input(batch, "fname"))
-            samples, _ = self.sample_log(
+            samples, intermediates, predicted_noise, predicted_uncond_noise = self.sample_log(
                 cond=c,
                 batch_size=batch_size,
                 x_T=x_T,
@@ -1543,6 +1552,7 @@ class LatentDiffusion(DDPM):
                 unconditional_guidance_scale=unconditional_guidance_scale,
                 unconditional_conditioning=unconditional_conditioning,
                 use_plms=use_plms,
+                attention_weights=attention_weights
             )
 
             mel = self.decode_first_stage(samples)
@@ -1567,7 +1577,7 @@ class LatentDiffusion(DDPM):
                 print(' '.join('{:.2f}'.format(num) for num in similarity.detach().cpu().tolist()))
                 print("Choose the following indexes as the output:", best_index)
 
-            return waveform
+            return waveform, intermediates, predicted_noise, predicted_uncond_noise
 
     @torch.no_grad()
     def generate_sample(
@@ -1693,7 +1703,7 @@ class LatentDiffusion(DDPM):
 class DiffusionWrapper(nn.Module):
     def __init__(self, diff_model_config, conditioning_key):
         super().__init__()
-        self.diffusion_model = instantiate_from_config(diff_model_config)
+        self.diffusion_model = instantiate_from_config(diff_model_config) #PK: UNet model
 
         self.conditioning_key = conditioning_key
 
@@ -1711,7 +1721,7 @@ class DiffusionWrapper(nn.Module):
 
         self.being_verbosed_once = False
 
-    def forward(self, x, t, cond_dict: dict = {}):
+    def forward(self, x, t, cond_dict: dict = {}, attention_weights=None):
         x = x.contiguous()
         t = t.contiguous()
 
@@ -1767,7 +1777,7 @@ class DiffusionWrapper(nn.Module):
         #         print("y", y.size())
         #     self.being_verbosed_once = True
         out = self.diffusion_model(
-            xc, t, context_list=context_list, y=y, context_attn_mask_list=attn_mask_list
+            xc, t, context_list=context_list, y=y, context_attn_mask_list=attn_mask_list, attention_weights=attention_weights
         )
         return out
         self.warmup_step()

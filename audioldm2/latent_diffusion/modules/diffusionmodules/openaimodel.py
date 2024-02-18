@@ -78,7 +78,7 @@ class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
     support it as an extra input.
     """
 
-    def forward(self, x, emb, context_list=None, mask_list=None):
+    def forward(self, x, emb, context_list=None, mask_list=None, attention_weights=None):
         # The first spatial transformer block does not have context
         spatial_transformer_id = 0
         context_list = [None] + context_list
@@ -96,7 +96,7 @@ class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
                         mask_list[spatial_transformer_id],
                     )
 
-                x = layer(x, context, mask=mask)
+                x = layer(x, context, mask=mask, attention_weights=attention_weights)
                 spatial_transformer_id += 1
             else:
                 x = layer(x)
@@ -834,13 +834,14 @@ class UNetModel(nn.Module):
         self.middle_block.apply(convert_module_to_f32)
         self.output_blocks.apply(convert_module_to_f32)
 
-    def forward(
+    def forward( #UNet Forward
         self,
         x,
         timesteps=None,
         y=None,
         context_list=None,
         context_attn_mask_list=None,
+        attention_weights=None,
         **kwargs,
     ):
         """
@@ -871,13 +872,13 @@ class UNetModel(nn.Module):
 
         h = x.type(self.dtype)
         for module in self.input_blocks:
-            h = module(h, emb, context_list, context_attn_mask_list)
+            h = module(h, emb, context_list, context_attn_mask_list, attention_weights)
             hs.append(h)
-        h = self.middle_block(h, emb, context_list, context_attn_mask_list)
+        h = self.middle_block(h, emb, context_list, context_attn_mask_list, attention_weights)
         for module in self.output_blocks:
             concate_tensor = hs.pop()
             h = th.cat([h, concate_tensor], dim=1)
-            h = module(h, emb, context_list, context_attn_mask_list)
+            h = module(h, emb, context_list, context_attn_mask_list, attention_weights)
         h = h.type(x.dtype)
         if self.predict_codebook_ids:
             return self.id_predictor(h)

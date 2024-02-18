@@ -340,17 +340,16 @@ class CrossAttention(nn.Module):
             nn.Linear(inner_dim, query_dim), nn.Dropout(dropout)
         )
 
-    def forward(self, x, context=None, mask=None):
+    def forward(self, x, context=None, mask=None, attention_weights=None):
         h = self.heads
-
         q = self.to_q(x)
+        orig_context = context #PK added
         context = default(context, x)
 
+        
         k = self.to_k(context)
         v = self.to_v(context)
-
         q, k, v = map(lambda t: rearrange(t, "b n (h d) -> (b h) n d", h=h), (q, k, v))
-
         sim = einsum("b i d, b j d -> b i j", q, k) * self.scale
 
         if exists(mask):
@@ -361,6 +360,14 @@ class CrossAttention(nn.Module):
 
         # attention, what we cannot get enough of
         attn = sim.softmax(dim=-1)
+        if orig_context is not None and attention_weights is not None:
+            attn_rearranged = rearrange(attn, "b i j -> j b i")
+            wts = torch.ones_like(attn_rearranged).cuda() 
+            wts = wts * attention_weights[:, None, None]
+            attn_rearranged = attn_rearranged * wts
+            attn_rearranged_ = rearrange(attn_rearranged, "j b i -> b i j")
+            #print('************* attentions weights ==>', x.shape, attention_weights, context.shape, attn.shape, attn_rearranged.shape, attn_rearranged_.shape, torch.max(attn), torch.min(attn))
+            attn = attn_rearranged_
 
         out = einsum("b i j, b j d -> b i d", attn, v)
         out = rearrange(out, "(b h) n d -> b n (h d)", h=h)
@@ -395,17 +402,17 @@ class BasicTransformerBlock(nn.Module):
         self.norm3 = nn.LayerNorm(dim)
         self.checkpoint = checkpoint
 
-    def forward(self, x, context=None, mask=None):
+    def forward(self, x, context=None, mask=None, attention_weights=None):
         if context is None:
             return checkpoint(self._forward, (x,), self.parameters(), self.checkpoint)
         else:
             return checkpoint(
-                self._forward, (x, context, mask), self.parameters(), self.checkpoint
+                self._forward, (x, context, mask, attention_weights), self.parameters(), self.checkpoint
             )
 
-    def _forward(self, x, context=None, mask=None):
+    def _forward(self, x, context=None, mask=None, attention_weights=None):
         x = self.attn1(self.norm1(x)) + x
-        x = self.attn2(self.norm2(x), context=context, mask=mask) + x
+        x = self.attn2(self.norm2(x), context=context, mask=mask, attention_weights=attention_weights) + x
         x = self.ff(self.norm3(x)) + x
         return x
 
@@ -453,7 +460,7 @@ class SpatialTransformer(nn.Module):
             nn.Conv2d(inner_dim, in_channels, kernel_size=1, stride=1, padding=0)
         )
 
-    def forward(self, x, context=None, mask=None):
+    def forward(self, x, context=None, mask=None, attention_weights=None):
         # note: if no context is given, cross-attention defaults to self-attention
         b, c, h, w = x.shape
         x_in = x
@@ -461,7 +468,7 @@ class SpatialTransformer(nn.Module):
         x = self.proj_in(x)
         x = rearrange(x, "b c h w -> b (h w) c")
         for block in self.transformer_blocks:
-            x = block(x, context=context, mask=mask)
+            x = block(x, context=context, mask=mask, attention_weights=attention_weights)
         x = rearrange(x, "b (h w) c -> b c h w", h=h, w=w)
         x = self.proj_out(x)
         return x + x_in

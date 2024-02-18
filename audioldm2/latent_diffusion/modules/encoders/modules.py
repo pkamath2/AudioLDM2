@@ -179,6 +179,24 @@ class FlanT5HiddenState(nn.Module):
             truncation=True,
             return_tensors="pt",
         )
+
+        # # PK: Map word to token --start
+        # desired_output = []
+        # print('word ids =>', batch.word_ids())
+        # for word_id in batch.word_ids():
+        #     if word_id is not None:
+        #         start, end = batch.word_to_tokens(word_id)
+        #         if start == end - 1:
+        #             tokens = [start]
+        #         else:
+        #             tokens = [start, end-1]
+        #         if len(desired_output) == 0 or desired_output[-1] != tokens:
+        #             desired_output.append(tokens)
+        # # for ind, word in enumerate([i for i in prompt[0].split(' ')]):
+        # #     print(word, desired_output[ind])
+        # print("Token for each word in sentence =>", desired_output, batch.input_ids[0].shape)
+        # # PK: Map word to token --end
+                    
         input_ids, attention_mask = batch.input_ids.to(device), batch.attention_mask.to(
             device
         )
@@ -197,6 +215,31 @@ class FlanT5HiddenState(nn.Module):
             attention_mask.float(),
         ]  # Attention mask == 1 means usable token
 
+    def get_words_token_mapping(self, prompt):
+        batch = self.tokenizer(
+            prompt,
+            max_length=128,  # self.tokenizer.model_max_length
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+        )
+
+        # PK: Map word to token --start
+        desired_output = []
+        for word_id in batch.word_ids():
+            if word_id is not None:
+                start, end = batch.word_to_tokens(word_id)
+                if start == end - 1:
+                    tokens = [start]
+                else:
+                    tokens = [start, end-1]
+                if len(desired_output) == 0 or desired_output[-1] != tokens:
+                    desired_output.append(tokens)
+        print("Token for each word in sentence =>", desired_output, batch.input_ids[0].shape)
+        for ind, word in enumerate([i for i in prompt[0].split(' ')]):
+            print(word, desired_output[ind])
+        
+        # PK: Map word to token --end
 
 class SequenceGenAudioMAECond(Sequence2AudioMAE):
     def __init__(
