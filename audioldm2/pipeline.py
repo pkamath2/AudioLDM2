@@ -174,6 +174,7 @@ def build_model(ckpt_path=None, config=None, device=None, model_name="audioldm2-
 def text_to_audio(
     latent_diffusion,
     text,
+    x_T=None,
     transcription="",
     seed=42,
     ddim_steps=200,
@@ -183,6 +184,7 @@ def text_to_audio(
     n_candidate_gen_per_text=3,
     latent_t_per_second=25.6,
     config=None,
+    attention_weights=None
 ):
 
     seed_everything(int(seed))
@@ -193,12 +195,14 @@ def text_to_audio(
     latent_diffusion.latent_t_size = int(duration * latent_t_per_second)
 
     with torch.no_grad():
-        waveform = latent_diffusion.generate_batch(
+        waveform, intermediates, predicted_noise, predicted_uncond_noise = latent_diffusion.generate_batch(
             batch,
+            x_T=x_T,
             unconditional_guidance_scale=guidance_scale,
             ddim_steps=ddim_steps,
             n_gen=n_candidate_gen_per_text,
             duration=duration,
+            attention_weights=attention_weights
         )
 
-    return waveform
+    return waveform, intermediates, predicted_noise, predicted_uncond_noise
