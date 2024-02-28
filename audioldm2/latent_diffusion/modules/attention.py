@@ -360,18 +360,27 @@ class CrossAttention(nn.Module):
 
         # attention, what we cannot get enough of
         attn = sim.softmax(dim=-1)
-        if orig_context is not None and attention_weights is not None:
+        
+        if orig_context is not None and attention_weights is not None and context.shape[1] == attn.shape[-1]:
             attn_rearranged = rearrange(attn, "b i j -> j b i")
             wts = torch.ones_like(attn_rearranged).cuda() 
             wts = wts * attention_weights[:, None, None]
             attn_rearranged = attn_rearranged * wts
             attn_rearranged_ = rearrange(attn_rearranged, "j b i -> b i j")
-            #print('************* attentions weights ==>', x.shape, attention_weights, context.shape, attn.shape, attn_rearranged.shape, attn_rearranged_.shape, torch.max(attn), torch.min(attn))
+            # print('************* attentions weights ==>', x.shape, q.shape, k.shape, attention_weights, context.shape, attn.shape, attn_rearranged.shape, attn_rearranged_.shape, torch.max(attn), torch.min(attn))
             attn = attn_rearranged_
 
+        ret_attn = None
+        if orig_context is not None and attention_weights is not None:
+            ret_attn = attn
+
         out = einsum("b i j, b j d -> b i d", attn, v)
+        # if orig_context is not None and attention_weights is not None:
+        #     print('------before rearrange', attn.shape, out.shape)
         out = rearrange(out, "(b h) n d -> b n (h d)", h=h)
-        return self.to_out(out)
+        # if orig_context is not None and attention_weights is not None:
+        #     print('------', attn.shape, out.shape)
+        return self.to_out(out), ret_attn
 
 
 class BasicTransformerBlock(nn.Module):
@@ -411,8 +420,8 @@ class BasicTransformerBlock(nn.Module):
             )
 
     def _forward(self, x, context=None, mask=None, attention_weights=None):
-        x = self.attn1(self.norm1(x)) + x
-        x = self.attn2(self.norm2(x), context=context, mask=mask, attention_weights=attention_weights) + x
+        x = self.attn1(self.norm1(x))[0] + x
+        x = self.attn2(self.norm2(x), context=context, mask=mask, attention_weights=attention_weights)[0] + x
         x = self.ff(self.norm3(x)) + x
         return x
 

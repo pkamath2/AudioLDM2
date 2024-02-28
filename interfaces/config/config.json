@@ -1,0 +1,28 @@
+[
+    {
+        "id":0, 
+        "text": "A dog barking multiple times in a room with reverb",
+        "slider_words": ["multiple", "reverb"]
+    },
+    {
+        "id":1, 
+        "text": "A drumstick is hitting a hard metal surface many times in a large room with reverb",
+        "slider_words": ["hitting", "many", "hard","metal","reverb"]
+    },
+    {
+        "id":2, 
+        "text": "A person walking on crunchy snow",
+        "slider_words": ["crunchy"]
+    },
+    {
+        "id":3, 
+        "text": "The sound of wind blowing",
+        "slider_words": ["blowing"]
+    },
+    {
+        "id":4, 
+        "text": "The sound of water filling an empty metal container",
+        "slider_words": ["filling", "metal"]
+    }
+]
+

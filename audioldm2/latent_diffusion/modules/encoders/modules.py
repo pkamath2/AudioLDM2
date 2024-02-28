@@ -239,6 +239,7 @@ class FlanT5HiddenState(nn.Module):
         for ind, word in enumerate([i for i in prompt[0].split(' ')]):
             print(word, desired_output[ind])
         
+        return desired_output
         # PK: Map word to token --end
 
 class SequenceGenAudioMAECond(Sequence2AudioMAE):
@@ -769,6 +770,7 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
                         text_data[key] = text_data[key].unsqueeze(0)
 
                 embed = self.model.get_text_embedding(text_data)
+
 
         embed = embed.unsqueeze(1)
         for i in range(embed.size(0)):
