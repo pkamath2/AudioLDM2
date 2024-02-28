@@ -9,6 +9,7 @@ import pickle
 import urllib.request
 
 from tqdm import tqdm
+from stqdm import stqdm
 import json
 
 import sys
@@ -65,7 +66,7 @@ def populate_prompts():
         prompts_map[prompt['text']] = {'id':prompt['id'], 'slider_words': prompt['slider_words']}        
     return prompts_map
 
-@st.cache_data
+@st.cache_resource
 def get_model():
     print('Loading model')
     
@@ -122,7 +123,7 @@ def sample_diffusion(latent_diffusion):
         time_range = np.flip(timesteps)
         total_steps = timesteps.shape[0]
         print(f"Running DDIM Sampling with {total_steps} timesteps")
-        iterator = tqdm(time_range, desc="DDIM Sampler", total=total_steps)
+        iterator = stqdm(time_range, desc="DDIM Sampler", total=total_steps)
     
         for i, step in enumerate(iterator):
             index = total_steps - i - 1
@@ -195,9 +196,9 @@ def get_attention_weights(latent_diffusion):
         print(word, tokens[ind])
         word_token_map[word] = tokens[ind]
 
-        if 'slider_'+word in st.session_state:
-            print(st.session_state['slider_'+word], tokens[ind][0], tokens[ind][-1]+1)
-            attention_weights[tokens[ind][0]:tokens[ind][-1]+1] = st.session_state['slider_'+word]
+        if 'slider_'+st.session_state['selected_prompt_id']+'_'+word in st.session_state:
+            print(st.session_state['slider_'+st.session_state['selected_prompt_id']+'_'+word], word_token_map[word][0], word_token_map[word][-1]+1)
+            attention_weights[word_token_map[word][0]:word_token_map[word][-1]+1] = st.session_state['slider_'+st.session_state['selected_prompt_id']+'_'+word]
     
     print(attention_weights)
 
@@ -205,7 +206,9 @@ def get_attention_weights(latent_diffusion):
 
 def main():
 
+    print('before get model')
     latent_diffusion = get_model()
+    print('after get model')
 
     prompts_map = populate_prompts()
 
@@ -214,9 +217,9 @@ def main():
 
     prompt_selected =  st.selectbox('Select a prompt', sorted(prompts_map.keys()), key='prompt_selected')
     slider_words = prompts_map[prompt_selected]['slider_words']
-    slider_id = str(prompts_map[prompt_selected]['id'])
+    prompt_id = str(prompts_map[prompt_selected]['id'])
 
-    
+    st.session_state['selected_prompt_id'] = str(prompt_id)
     
 
     s_wav, s_spec = sample_diffusion(latent_diffusion)
@@ -234,7 +237,7 @@ def main():
         st.markdown("<div style='text-align: left;'>"+display_text+"</div>", unsafe_allow_html=True)
         st.markdown("<br/>", unsafe_allow_html=True)
         for word in slider_words:
-            slider_position=st.slider(word, min_value=-5.0, max_value=5.0, value=1.0, step=0.1,  format=None, key='slider_'+word, help=None, args=None, kwargs=None, disabled=False)
+            slider_position=st.slider(word, min_value=-5.0, max_value=5.0, value=1.0, step=0.1,  format=None, key='slider_'+st.session_state['selected_prompt_id']+'_'+word, help=None, args=None, kwargs=None, disabled=False)
     with col2:
         vert_space = '<div style="padding: 25%;">&nbsp;</div>'
         st.markdown(vert_space, unsafe_allow_html=True)

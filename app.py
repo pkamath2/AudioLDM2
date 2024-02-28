@@ -8,8 +8,8 @@ from share_btn import community_icon_html, loading_icon_html, share_js
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
-# default_checkpoint="audioldm2-full"
-default_checkpoint="audioldm_48k"
+# default_checkpoint="audioldm2-full" #Uses 18GB GPU mem
+default_checkpoint="audioldm_48k" #Uses 11 GB GPU mem
 audioldm = None
 current_model_name = None
 
