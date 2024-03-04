@@ -26,5 +26,21 @@
         "locs": [
             0.05
         ]
+    },
+    "hit_muffled_sample0_rate1": {
+        "impulse_time": 0.1,
+        "attack_lf": 100,
+        "attack_hf": 300,
+        "trail_lf": 100,
+        "trail_hf": 300,
+        "damping_mult": 0.99,
+        "damping_fade_expo": 2,
+        "filter_order": 2,
+        "hittype": "hit",
+        "locs": [
+            0.05,
+            4.05,
+            9.06
+        ]
     }
 }
