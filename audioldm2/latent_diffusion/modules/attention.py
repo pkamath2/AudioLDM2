@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn, einsum
 from einops import rearrange, repeat
+import numpy as np
 
 from audioldm2.latent_diffusion.modules.diffusionmodules.util import checkpoint
 
@@ -340,7 +341,7 @@ class CrossAttention(nn.Module):
             nn.Linear(inner_dim, query_dim), nn.Dropout(dropout)
         )
 
-    def forward(self, x, context=None, mask=None, attention_weights=None):
+    def forward(self, x, context=None, mask=None, attention_weights=None, from_where=None):
         h = self.heads
         q = self.to_q(x)
         orig_context = context #PK added
@@ -360,8 +361,16 @@ class CrossAttention(nn.Module):
         # attention, what we cannot get enough of
         attn = sim.softmax(dim=-1)
 
+        attention_weights_present = False
+        attention_weights_interpolates_present = False
+
+        if attention_weights is not None:
+            attention_weights_present = True
+
+            if 'interpolates' in attention_weights:
+                attention_weights_interpolates_present = True
+
         if orig_context is not None and attention_weights is not None: 
-            # attention_weights_type = attention_weights['type']
 
             attention_interpolates = None
             if 'interpolates' in attention_weights:
@@ -372,14 +381,14 @@ class CrossAttention(nn.Module):
                     interpolates_mult = attention_weights['interpolates_mult']
 
                     attn_rearranged = rearrange(attn, "b i j -> j b i")
+
                     for dest_idx, i in zip(dest_idxs, range(len(dest_idxs))):
                         if type(dest_idx) == list:
                             for dest_idx_ in dest_idx:
                                 attn_rearranged[dest_idx_] = attention_interpolates[i]
                         else:
                             attn_rearranged[dest_idx] = attention_interpolates[i]
-                    
-                    
+
                     attn_rearranged_ = rearrange(attn_rearranged, "j b i -> b i j")
                     attn = attn_rearranged_
 
@@ -433,8 +442,18 @@ class CrossAttention(nn.Module):
         #             attn_rearranged_ = rearrange(attn_rearranged, "j b i -> b i j")
         #             attn = attn_rearranged_
 
+        # ret_attn = {}
+        # if orig_context is not None:
+        #     print('Final attn shape -->', attn.shape)
+        #     # ret_attn = attn
+        #     ret_attn['attn'] = attn
+        #     ret_attn['q'] = q
+        #     ret_attn['k'] = k
+        #     ret_attn['v'] = v
+                    
         ret_attn = None
         if orig_context is not None:
+            # print('Final attn shape -->', attn.shape)
             ret_attn = attn
 
         out = einsum("b i j, b j d -> b i d", attn, v)
@@ -479,8 +498,8 @@ class BasicTransformerBlock(nn.Module):
             )
 
     def _forward(self, x, context=None, mask=None, attention_weights=None):
-        x = self.attn1(self.norm1(x))[0] + x
-        x = self.attn2(self.norm2(x), context=context, mask=mask, attention_weights=attention_weights)[0] + x
+        x = self.attn1(self.norm1(x), from_where="attn1")[0] + x
+        x = self.attn2(self.norm2(x), context=context, mask=mask, attention_weights=attention_weights, from_where="attn2")[0] + x
         x = self.ff(self.norm3(x)) + x
         return x
 

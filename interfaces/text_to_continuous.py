@@ -121,6 +121,8 @@ def main():
 
     prompt_seed = prompts_map[prompt_selected]['prompt_seed']
 
+    num_ddim_steps = prompts_map[prompt_selected]['num_steps']
+
     st.session_state['selected_prompt_id'] = str(prompt_id)
 
     selected_word_list = []
@@ -143,12 +145,12 @@ def main():
         final_target_prompt = source_prompt_format.format(noun=st.session_state['prompt_noun_replacements'])
         s_wav, s_spec = sample_diffusion_attention_edit(latent_diffusion, prompt_selected, final_target_prompt, \
                                                     selected_word_list=selected_word_list, value_list=selected_word_value_list,\
-                                                    attention_edit_level=0.9, replace_source_word_id=None, random_seed=prompt_seed)
+                                                    attention_edit_level=0.9, replace_source_word_id=None, random_seed=prompt_seed, ddim_steps=num_ddim_steps)
     else: 
         final_target_prompt = None    
         s_wav, s_spec = sample_diffusion_attention_edit(latent_diffusion, None, prompt_selected, \
                                                         selected_word_list=selected_word_list, value_list=selected_word_value_list,\
-                                                        attention_edit_level=None, replace_source_word_id=None, random_seed=prompt_seed)
+                                                        attention_edit_level=None, replace_source_word_id=None, random_seed=prompt_seed, ddim_steps=num_ddim_steps)
     
 
     if final_target_prompt is None:
