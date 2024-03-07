@@ -345,7 +345,7 @@ class CrossAttention(nn.Module):
         h = self.heads
         q = self.to_q(x)
         orig_q = q.clone()
-        orig_context = context #PK added
+        orig_context = context 
         context = default(context, x)
         
         k = self.to_k(context)
@@ -353,17 +353,17 @@ class CrossAttention(nn.Module):
         v = self.to_v(context)
         orig_v = v.clone()
 
-        attention_reweights = None
+        word_weights = None
         if orig_context is not None and attention_weights is not None:
-            if 'q' in attention_weights:
+            if 'q' in attention_weights and 'q' in attention_weights['interpolate_terms']:
                 q = attention_weights['q']
-            if 'k' in attention_weights:
+            if 'k' in attention_weights and 'k' in attention_weights['interpolate_terms']:
                 k = attention_weights['k']
-            if 'v' in attention_weights:
+            if 'v' in attention_weights and 'v' in attention_weights['interpolate_terms']:
                 v = attention_weights['v']
 
-            if 'reweights' in attention_weights:
-                attention_reweights = attention_weights['reweights']
+            if 'word_weights' in attention_weights:
+                word_weights = attention_weights['word_weights']
 
         q, k, v = map(lambda t: rearrange(t, "b n (h d) -> (b h) n d", h=h), (q, k, v))
         sim = einsum("b i d, b j d -> b i j", q, k) * self.scale
@@ -377,13 +377,14 @@ class CrossAttention(nn.Module):
         # attention, what we cannot get enough of
         attn = sim.softmax(dim=-1)
 
-        if attention_reweights is not None and context.shape[1] == attn.shape[-1] and attention_reweights.shape[0] == attn.shape[-1]:
-            attn_rearranged = rearrange(attn, "b i j -> j b i")
-            wts = torch.ones_like(attn_rearranged).cuda() 
-            wts = wts * attention_reweights[:, None, None]
-            attn_rearranged = attn_rearranged * wts
-            attn_rearranged_ = rearrange(attn_rearranged, "j b i -> b i j")
-            attn = attn_rearranged_
+        if orig_context is not None and word_weights is not None:
+            v_rearranged = rearrange(v, "h i j -> i h j") 
+            wts = torch.ones_like(v_rearranged).cuda() 
+            wts = wts * word_weights[:, None, None]
+            v_rearranged = v_rearranged * wts
+            v_rearranged_ = rearrange(v_rearranged, "i h j -> h i j")
+            v = v_rearranged_
+            orig_v = rearrange(v_rearranged_, "(b h) n d -> b n (h d)", h=h)
 
         ret_attn = None
         if orig_context is not None:
