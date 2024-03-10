@@ -79,61 +79,22 @@ def get_model():
     return latent_diffusion
 
 
-def generate_left_target(latent_diffusion):
-    generate_left_button_state = None
-    if 'generate_left_button' in st.session_state:
-        generate_left_button_state = st.session_state['generate_left_button']
-    
-    if generate_left_button_state:
-        source_text_str = st.session_state['source_text']
-
-        with st.spinner('Running...'):
-            wav, img = sample_diffusion_attention_edit(latent_diffusion, source_text=None, target_text=source_text_str, random_seed=1947)
-            st.session_state['source_image_placeholder'].image(img)
-            st.session_state['source_audio_placeholder'].audio(wav, format="audio/wav", start_time=0, sample_rate=16000)
-
-            st.session_state['source_image_placeholder_img'] = img
-            st.session_state['source_audio_placeholder_wav'] = wav
+def generate_sample(latent_diffusion, source_text, target_text, target_selected_word_list, target_value_list, random_seed, ddim_steps):
+    with st.spinner('Running...'):
+        wav, img = sample_diffusion_attention_edit(latent_diffusion, source_text=source_text, target_text=target_text, \
+                                                        target_selected_word_list=target_selected_word_list, target_value_list=target_value_list,\
+                                                        random_seed=random_seed, ddim_steps=ddim_steps)
+        
+    return wav, img
    
 
 
-def generate_right_target(latent_diffusion):
-    generate_right_button_state = None
-    if 'generate_right_button' in st.session_state:
-        generate_right_button_state = st.session_state['generate_right_button']
-    
-    if generate_right_button_state:
-        target_text_str = st.session_state['target_text']
-
-        with st.spinner('Running...'):
-            wav, img = sample_diffusion_attention_edit(latent_diffusion, source_text=None, target_text=target_text_str, random_seed=1947)
-            st.session_state['target_image_placeholder'].image(img)
-            st.session_state['target_audio_placeholder'].audio(wav, format="audio/wav", start_time=0, sample_rate=16000)
-
-            st.session_state['target_image_placeholder_img'] = img
-            st.session_state['target_audio_placeholder_wav'] = wav
 
 
-def generate_morph(latent_diffusion):
-    generate_morph_button_state = None
-    if 'generate_morph_button' in st.session_state:
-        generate_morph_button_state = st.session_state['generate_morph_button']
 
-    if generate_morph_button_state:
-        print('Inside sample diffusion morph -', generate_morph_button_state,'-', st.session_state['interpolation_level'])
-
-        source_text_str = st.session_state['source_text']
-        target_text_str = st.session_state['target_text']
-
-        with st.spinner('Running...'):
-            wav, img = sample_diffusion_attention_edit(latent_diffusion, source_text=source_text_str, target_text=target_text_str, \
-                                                    random_seed=1947, interpolation_level=st.session_state['interpolation_level'])
-            st.session_state['morph_image_placeholder'].image(img)
-            st.session_state['morph_audio_placeholder'].audio(wav, format="audio/wav", start_time=0, sample_rate=16000)
-
-            st.session_state['morph_image_placeholder_img'] = img
-            st.session_state['morph_audio_placeholder_wav'] = wav
-
+def default_target_prompt():
+    if 'prompt_noun_replacements' in st.session_state:
+        st.session_state['prompt_noun_replacements'] = '-None-'
 
 def main():
     
@@ -145,7 +106,6 @@ def main():
     </style>
     """
     st.write(css, unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center;'>Audio Morphing w/ Text</h3>", unsafe_allow_html=True)
 
     print('before get model')
     latent_diffusion = get_model()
@@ -153,61 +113,111 @@ def main():
 
     prompts_map = populate_prompts()
 
-    col1, col2, col3, col4, col5 = st.columns((0.3,0.05,0.3,0.05,0.3))
+
+    st.markdown("<h3 style='text-align: center;'>'Text-to-Continuous' <br/> Semantic Control For Audio</h3>", unsafe_allow_html=True)
+
+    prompt_selected =  st.selectbox('Select a prompt', prompts_map.keys(), key='prompt_selected', on_change=default_target_prompt)
+    slider_words = prompts_map[prompt_selected]['source_slider_words']
+    prompt_id = str(prompts_map[prompt_selected]['id'])
+
+    prompt_seed = prompts_map[prompt_selected]['prompt_seed']
+
+    num_ddim_steps = prompts_map[prompt_selected]['num_steps']
+
+    st.session_state['selected_prompt_id'] = str(prompt_id)
+
+    selected_word_list = []
+    selected_word_value_list = []
+    for slider_word in slider_words:
+        selected_word_list.append(slider_word['word'])
+        if 'slider_'+st.session_state['selected_prompt_id']+'_'+slider_word['word'] in st.session_state:
+            selected_word_value_list.append(st.session_state['slider_'+st.session_state['selected_prompt_id']+'_'+slider_word['word']])
+        else:
+            selected_word_value_list.append(1)
+
+    if st.session_state['prompt_selected'] != '-None-':
+        s_wav, s_spec = generate_sample(latent_diffusion, source_text=None, target_text=prompt_selected, \
+                                                            target_selected_word_list=selected_word_list, target_value_list=selected_word_value_list,\
+                                                            random_seed=prompt_seed, ddim_steps=num_ddim_steps)
+
+    display_text = prompt_selected
+    for slider_word in slider_words:
+        display_text = display_text.replace(slider_word['word'], "<span style='background-color: yellow; color:black;'>"+slider_word['word']+"</span>")
+    st.markdown("<div style='text-align: center;'><h3>"+display_text+"</h3></div>", unsafe_allow_html=True)
+    st.markdown("<br/>", unsafe_allow_html=True)
+    
+    col1, col2, col3, col4, col5 = st.columns((0.2,0.1,0.4,0.05,0.25))
     
     with col1:
-        st.markdown("<h3 style='text-align: center;'>Left</h3>", unsafe_allow_html=True)
-        st.text_input(label="Source Text", key="source_text", value="", label_visibility='hidden')
-
-        source_image_placeholder = st.empty()
-        source_audio_placeholder = st.empty()
-        st.session_state['source_image_placeholder'] = source_image_placeholder
-        st.session_state['source_audio_placeholder'] = source_audio_placeholder
-        if 'source_image_placeholder_img' in st.session_state:
-            source_image_placeholder.image(st.session_state['source_image_placeholder_img'])
-        if 'source_audio_placeholder_wav' in st.session_state:
-            source_audio_placeholder.audio(st.session_state['source_audio_placeholder_wav'], format="audio/wav", start_time=0, sample_rate=16000)
-        
-        st.button("Generate Left Target", on_click=generate_left_target(latent_diffusion), type='secondary', key="generate_left_button", use_container_width=True)
-        
+        st.markdown("<br/>", unsafe_allow_html=True)
+        display_text = prompt_selected
+        for slider_word in slider_words:
+            display_text = display_text.replace(slider_word['word'], "<span style='background-color: yellow; color:black;'>"+slider_word['word']+"</span>")
+        st.markdown("<div style='text-align: left;'>"+display_text+"</div>", unsafe_allow_html=True)
+        st.markdown("<br/>", unsafe_allow_html=True)
+        for slider_word in slider_words:
+            slider_position=st.slider(slider_word['word'], min_value=slider_word['slider_range'][0], max_value=slider_word['slider_range'][1], \
+                                      value=1.0, step=0.1,  format=None, key='slider_'+st.session_state['selected_prompt_id']+'_'+slider_word['word'], disabled=False)
     with col2:
-        st.markdown("<br/>", unsafe_allow_html=True)
-
+        vert_space = '<div style="padding: 25%;">&nbsp;</div>'
+        st.markdown(vert_space, unsafe_allow_html=True)
+        # st.button("**Generate** =>", on_click=sample_diffusion(latent_diffusion), type='primary')
     with col3:
-        st.markdown("<h3 style='text-align: center;'></h3>", unsafe_allow_html=True)
-        slider_position=st.slider('Interpolation Level', min_value=0.0, max_value=1.0, value=0.0, step=0.1, label_visibility="hidden",  \
-                                  format=None, key='interpolation_level', disabled=False)
-        st.markdown("<br/>", unsafe_allow_html=True)
+        st.image(s_spec)
+        st.audio(s_wav, format="audio/wav", start_time=0, sample_rate=16000)
+    # with col1:
+    #     st.markdown("<h3 style='text-align: center;'>Left</h3>", unsafe_allow_html=True)
+    #     st.text_input(label="Source Text", key="source_text", value="", label_visibility='hidden')
+
+    #     source_image_placeholder = st.empty()
+    #     source_audio_placeholder = st.empty()
+    #     st.session_state['source_image_placeholder'] = source_image_placeholder
+    #     st.session_state['source_audio_placeholder'] = source_audio_placeholder
+    #     if 'source_image_placeholder_img' in st.session_state:
+    #         source_image_placeholder.image(st.session_state['source_image_placeholder_img'])
+    #     if 'source_audio_placeholder_wav' in st.session_state:
+    #         source_audio_placeholder.audio(st.session_state['source_audio_placeholder_wav'], format="audio/wav", start_time=0, sample_rate=16000)
         
-        morph_image_placeholder = st.empty()
-        morph_audio_placeholder = st.empty()
-        st.session_state['morph_image_placeholder'] = morph_image_placeholder
-        st.session_state['morph_audio_placeholder'] = morph_audio_placeholder
-        if 'morph_image_placeholder_img' in st.session_state:
-            morph_image_placeholder.image(st.session_state['morph_image_placeholder_img'])
-        if 'morph_audio_placeholder_wav' in st.session_state:
-            morph_audio_placeholder.audio(st.session_state['morph_audio_placeholder_wav'], format="audio/wav", start_time=0, sample_rate=16000)
+    #     st.button("Generate Left Target", on_click=generate_left_target(latent_diffusion), type='secondary', key="generate_left_button", use_container_width=True)
+        
+    # with col2:
+    #     st.markdown("<br/>", unsafe_allow_html=True)
+
+    # with col3:
+    #     st.markdown("<h3 style='text-align: center;'></h3>", unsafe_allow_html=True)
+    #     slider_position=st.slider('Interpolation Level', min_value=0.0, max_value=1.0, value=0.0, step=0.1, label_visibility="hidden",  \
+    #                               format=None, key='interpolation_level', disabled=False)
+    #     st.markdown("<br/>", unsafe_allow_html=True)
+        
+    #     morph_image_placeholder = st.empty()
+    #     morph_audio_placeholder = st.empty()
+    #     st.session_state['morph_image_placeholder'] = morph_image_placeholder
+    #     st.session_state['morph_audio_placeholder'] = morph_audio_placeholder
+    #     if 'morph_image_placeholder_img' in st.session_state:
+    #         morph_image_placeholder.image(st.session_state['morph_image_placeholder_img'])
+    #     if 'morph_audio_placeholder_wav' in st.session_state:
+    #         morph_audio_placeholder.audio(st.session_state['morph_audio_placeholder_wav'], format="audio/wav", start_time=0, sample_rate=16000)
 
 
-        st.button("Generate Morph", on_click=generate_morph(latent_diffusion), type='primary', key="generate_morph_button", use_container_width=True)
+    #     st.button("Generate Morph", on_click=generate_morph(latent_diffusion), type='primary', key="generate_morph_button", use_container_width=True)
 
-    with col4:
-        st.markdown("<br/>", unsafe_allow_html=True)
+    # with col4:
+    #     st.markdown("<br/>", unsafe_allow_html=True)
 
-    with col5:
-        st.markdown("<h3 style='text-align: center;'>Right</h3>", unsafe_allow_html=True)
-        st.text_input(label="Target Text", key="target_text", value="", label_visibility="hidden")
+    # with col5:
+    #     st.markdown("<h3 style='text-align: center;'>Right</h3>", unsafe_allow_html=True)
+    #     st.text_input(label="Target Text", key="target_text", value="", label_visibility="hidden")
 
-        target_image_placeholder = st.empty()
-        target_audio_placeholder = st.empty()
-        st.session_state['target_image_placeholder'] = target_image_placeholder
-        st.session_state['target_audio_placeholder'] = target_audio_placeholder
-        if 'target_image_placeholder_img' in st.session_state:
-            target_image_placeholder.image(st.session_state['target_image_placeholder_img'])
-        if 'target_audio_placeholder_wav' in st.session_state:
-            target_audio_placeholder.audio(st.session_state['target_audio_placeholder_wav'], format="audio/wav", start_time=0, sample_rate=16000)
+    #     target_image_placeholder = st.empty()
+    #     target_audio_placeholder = st.empty()
+    #     st.session_state['target_image_placeholder'] = target_image_placeholder
+    #     st.session_state['target_audio_placeholder'] = target_audio_placeholder
+    #     if 'target_image_placeholder_img' in st.session_state:
+    #         target_image_placeholder.image(st.session_state['target_image_placeholder_img'])
+    #     if 'target_audio_placeholder_wav' in st.session_state:
+    #         target_audio_placeholder.audio(st.session_state['target_audio_placeholder_wav'], format="audio/wav", start_time=0, sample_rate=16000)
 
-        st.button("Generate Right Target", on_click=generate_right_target(latent_diffusion), type='secondary', key="generate_right_button", use_container_width=True)
+    #     st.button("Generate Right Target", on_click=generate_right_target(latent_diffusion), type='secondary', key="generate_right_button", use_container_width=True)
 
 
     st.markdown('<div style="text-align:center;color:white"><i>All audio samples on this page are generated with a sampling rate of 16kHz.</i></div>', unsafe_allow_html=True)

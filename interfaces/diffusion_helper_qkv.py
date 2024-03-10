@@ -160,7 +160,7 @@ def get_tokens(latent_diffusion, source_text, dest_text, source_word_index=None)
 
     dest_tokens = latent_diffusion.cond_stage_models\
     [latent_diffusion.cond_stage_model_metadata["crossattn_flan_t5"]["model_idx"]].get_words_token_mapping(dest_text)
-    print(source_tokens, dest_tokens)
+    # print(source_tokens, dest_tokens)
 
     if source_word_index is None:
         return source_tokens, dest_tokens
@@ -336,22 +336,20 @@ def set_weight_for_word(prompt, selected_word_list, value_list, latent_diffusion
 
     word_weights = torch.from_numpy(np.array([1.0 for i in range(context.shape[1])])).float().cuda()
 
-    print(prompt, selected_word_list)
+    # print(prompt, selected_word_list)
     for ind, word in enumerate(selected_word_list):
         ind_in_prompt = prompt.split(' ').index(word)
         word_weights[tokens[ind_in_prompt][0]:tokens[ind_in_prompt][-1]+1] = value_list[ind]
-    print(word_weights)
+    # print(word_weights)
     return word_weights
 
 
-
-
-def sample_diffusion_attention_edit(latent_diffusion, source_text, target_text, batch_size=1, ddim_steps=20, \
+def sample_diffusion_attention_core(latent_diffusion, source_text, target_text, batch_size=1, ddim_steps=20, \
                                     guidance_scale=3.0, random_seed=42, \
                                     interpolation_level=0.5,\
                                     source_selected_word_list=None, source_value_list=None, \
                                     target_selected_word_list=None, target_value_list=None,\
-                                    interpolate_terms=['q','k','v'], diffusion_type='normal'):
+                                    interpolate_terms=['q','k','v'], diffusion_type='normal', disable_tqdmoutput=False):
 
     edit_mode = False
     if source_text is not None:
@@ -392,8 +390,8 @@ def sample_diffusion_attention_edit(latent_diffusion, source_text, target_text, 
 
         time_range = np.flip(timesteps)
         total_steps = timesteps.shape[0]
-        print(f"Running DDIM Sampling with {total_steps} timesteps")
-        iterator = tqdm(time_range, desc="DDIM Sampler", total=total_steps)
+        # print(f"Running DDIM Sampling with {total_steps} timesteps")
+        iterator = tqdm(time_range, desc="DDIM Sampler", total=total_steps, disable=disable_tqdmoutput)
 
         
         source_word_weights = {} #used only for weighting source words
@@ -506,10 +504,31 @@ def sample_diffusion_attention_edit(latent_diffusion, source_text, target_text, 
             mel, savepath="", bs=None, name="", save=False
         )
 
+        return waveform[0][0], mel
+    
+        # return mel, waveform, save_attention_hook_handles, edithook_handles
+    
+
+
+
+def sample_diffusion_attention_edit(latent_diffusion, source_text, target_text, batch_size=1, ddim_steps=20, \
+                                    guidance_scale=3.0, random_seed=42, \
+                                    interpolation_level=0.5,\
+                                    source_selected_word_list=None, source_value_list=None, \
+                                    target_selected_word_list=None, target_value_list=None,\
+                                    interpolate_terms=['q','k','v'], diffusion_type='normal', disable_tqdmoutput=False):
+
+        waveform, mel = sample_diffusion_attention_core(latent_diffusion, source_text, target_text, batch_size, ddim_steps, \
+                                    guidance_scale, random_seed, \
+                                    interpolation_level,\
+                                    source_selected_word_list, source_value_list, \
+                                    target_selected_word_list, target_value_list,\
+                                    interpolate_terms, diffusion_type, disable_tqdmoutput)
+
         fig = plt.figure(figsize=(10, 8))
         if diffusion_type == 'morph':
             fig = plt.figure(figsize=(10, 8))
-        D = librosa.amplitude_to_db(np.abs(librosa.stft(waveform[0][0], hop_length=512)),ref=np.max)
+        D = librosa.amplitude_to_db(np.abs(librosa.stft(waveform, hop_length=512)),ref=np.max)
         librosa.display.specshow(D, y_axis='linear', sr=16000, hop_length=512, x_axis='time')
         io_buf = io.BytesIO()
         fig.savefig(io_buf, format='raw')
@@ -518,7 +537,7 @@ def sample_diffusion_attention_edit(latent_diffusion, source_text, target_text, 
                             newshape=(int(fig.bbox.bounds[3]), int(fig.bbox.bounds[2]), -1))
         io_buf.close()
 
-        return waveform[0][0], img_arr
+        return waveform, img_arr
     
         # return mel, waveform, save_attention_hook_handles, edithook_handles
             

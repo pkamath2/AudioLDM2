@@ -29,7 +29,7 @@ from audioldm2.utils import default_audioldm_config
 
 from audioldm2.gaverutils import gaver_sounds
 
-from diffusion_helper import *
+from diffusion_helper_qkv import *
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning) 
