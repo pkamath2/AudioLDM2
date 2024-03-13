@@ -179,7 +179,7 @@ class EditAttentionMatrices:
         if 'attention_weights' in kwargs and kwargs['attention_weights'] is not None:
             attention_weights = kwargs['attention_weights']
 
-            timestep = attention_weights['timestep'] #set in the sample_diffusion func
+            # timestep = attention_weights['timestep'] #set in the sample_diffusion func
             layer_id = self.save_attention_hook_layer_names.index(self.layer_name)
 
             # print(layer_id, self.layer_name)
@@ -245,10 +245,18 @@ class EditAttentionMatrices:
 
             # print(source_q.shape, target_q.shape)
             # print(source_k.shape, target_k.shape)
-
-            final_q = (1-interpolation_level) * source_q + interpolation_level*target_q
-            final_k = (1-interpolation_level) * source_k_list + interpolation_level*target_k_list
-            final_v = (1-interpolation_level) * source_v_list + interpolation_level*target_v_list
+            if interpolation_level == 0:
+                final_q = source_q 
+                final_k = source_k_list
+                final_v = source_v_list
+            elif interpolation_level == 1:
+                final_q = target_q
+                final_k = target_k_list
+                final_v = target_v_list
+            else:
+                final_q = (1-interpolation_level) * source_q + interpolation_level*target_q
+                final_k = (1-interpolation_level) * source_k_list + interpolation_level*target_k_list
+                final_v = (1-interpolation_level) * source_v_list + interpolation_level*target_v_list
 
             attention_weights['q'] = final_q.cuda()
             attention_weights['k'] = final_k.cuda()

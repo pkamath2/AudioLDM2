@@ -114,7 +114,7 @@ def main():
     prompts_map = populate_prompts()
 
 
-    st.markdown("<h3 style='text-align: center;'>'Text-to-Continuous' <br/> Semantic Control For Audio</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center;'>'Text-to-Continuous' <br/> Semantic Control For Audio w/ Text</h3>", unsafe_allow_html=True)
 
     prompt_selected =  st.selectbox('Select a prompt', prompts_map.keys(), key='prompt_selected', on_change=default_target_prompt)
     slider_words = prompts_map[prompt_selected]['source_slider_words']

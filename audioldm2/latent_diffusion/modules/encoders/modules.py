@@ -235,9 +235,9 @@ class FlanT5HiddenState(nn.Module):
                     tokens = [start, end-1]
                 if len(desired_output) == 0 or desired_output[-1] != tokens:
                     desired_output.append(tokens)
-        print("Token for each word in sentence =>", desired_output, batch.input_ids[0].shape)
-        for ind, word in enumerate([i for i in prompt[0].split(' ')]):
-            print(word, desired_output[ind])
+        # print("Token for each word in sentence =>", desired_output, batch.input_ids[0].shape)
+        # for ind, word in enumerate([i for i in prompt[0].split(' ')]):
+        #     print(word, desired_output[ind])
         
         return desired_output
         # PK: Map word to token --end
@@ -731,8 +731,8 @@ class CLAPAudioEmbeddingClassifierFreev2(nn.Module):
 
         # the 'fusion' truncate mode can be changed to 'rand_trunc' if run in unfusion mode
         if self.embed_mode == "audio":
-            if not self.training:
-                print("INFO: clap model calculate the audio embedding as condition")
+            # if not self.training:
+            #     print("INFO: clap model calculate the audio embedding as condition")
             with torch.no_grad():
                 # assert (
                 #     self.sampling_rate == 16000

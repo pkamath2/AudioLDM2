@@ -46,7 +46,7 @@ latent_t_per_second=25.6
 sample_rate=16000
 duration = 10.0 #Duration is minimum 10 secs. The generated sounds are weird for <10secs
 guidance_scale = 3
-random_seed = 42
+random_seed = 1947
 n_candidates = 1
 batch_size = 1
 ddim_steps = 20
@@ -88,7 +88,8 @@ def generate_left_target(latent_diffusion):
         source_text_str = st.session_state['source_text']
 
         with st.spinner('Running...'):
-            wav, img = sample_diffusion_attention_edit(latent_diffusion, source_text=None, target_text=source_text_str, random_seed=1947)
+            wav, img = sample_diffusion_attention_edit(latent_diffusion, source_text=None, target_text=source_text_str, random_seed=random_seed,\
+                                                       ddim_steps=ddim_steps)
             st.session_state['source_image_placeholder'].image(img)
             st.session_state['source_audio_placeholder'].audio(wav, format="audio/wav", start_time=0, sample_rate=16000)
 
@@ -106,7 +107,8 @@ def generate_right_target(latent_diffusion):
         target_text_str = st.session_state['target_text']
 
         with st.spinner('Running...'):
-            wav, img = sample_diffusion_attention_edit(latent_diffusion, source_text=None, target_text=target_text_str, random_seed=1947)
+            wav, img = sample_diffusion_attention_edit(latent_diffusion, source_text=None, target_text=target_text_str, random_seed=random_seed,\
+                                                       ddim_steps=ddim_steps)
             st.session_state['target_image_placeholder'].image(img)
             st.session_state['target_audio_placeholder'].audio(wav, format="audio/wav", start_time=0, sample_rate=16000)
 
@@ -127,7 +129,8 @@ def generate_morph(latent_diffusion):
 
         with st.spinner('Running...'):
             wav, img = sample_diffusion_attention_edit(latent_diffusion, source_text=source_text_str, target_text=target_text_str, \
-                                                    random_seed=1947, interpolation_level=st.session_state['interpolation_level'])
+                                                    random_seed=random_seed, interpolation_level=st.session_state['interpolation_level'],\
+                                                        interpolate_terms=['q','k','v'], ddim_steps=ddim_steps)
             st.session_state['morph_image_placeholder'].image(img)
             st.session_state['morph_audio_placeholder'].audio(wav, format="audio/wav", start_time=0, sample_rate=16000)
 
@@ -145,7 +148,7 @@ def main():
     </style>
     """
     st.write(css, unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center;'>Audio Morphing w/ Text</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center;'>'Text-to-Continuous' <br/> Sound Space Exploration w/ Text</h3>", unsafe_allow_html=True)
 
     print('before get model')
     latent_diffusion = get_model()
@@ -175,7 +178,7 @@ def main():
 
     with col3:
         st.markdown("<h3 style='text-align: center;'></h3>", unsafe_allow_html=True)
-        slider_position=st.slider('Interpolation Level', min_value=0.0, max_value=1.0, value=0.0, step=0.1, label_visibility="hidden",  \
+        slider_position=st.slider('Interpolation Level', min_value=0.0, max_value=1.0, value=0.0, step=0.01, label_visibility="hidden",  \
                                   format=None, key='interpolation_level', disabled=False)
         st.markdown("<br/>", unsafe_allow_html=True)
         
